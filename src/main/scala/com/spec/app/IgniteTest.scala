@@ -45,16 +45,20 @@ object IgniteTest {
 
   def readAsDataset(config:Config, spark:SparkSession):Unit = {
     import spark.implicits._
+    try {
+      System.out.println("Reading Dataset from Ignite Cache")
+      val personDS:Dataset[Person] = spark.read.format(IgniteDataFrameSettings.FORMAT_IGNITE)
+        .option(IgniteDataFrameSettings.OPTION_TABLE,  "SQL_PUBLIC_PERSON")
+        .option(IgniteDataFrameSettings.OPTION_CONFIG_FILE, configFile)
+        .load().as[Person]
 
-    System.out.println("Reading Dataset from Ignite Cache")
-    val personDS:Dataset[Person] = spark.read.format(IgniteDataFrameSettings.FORMAT_IGNITE)
-      .option(IgniteDataFrameSettings.OPTION_TABLE,  "SQL_PUBLIC_TAPADAAID")
-      .option(IgniteDataFrameSettings.OPTION_CONFIG_FILE, configFile)
-      .load().as[Person]
-    System.out.println(s"Dataset contains ${personDS.count()} records:")
-//    personDS.map( person =>
-//      System.out.println(s"id: ${person.id}\tName: ${person.name}")
-//    )
+      System.out.println(s"Dataset contains ${personDS.count()} records:")
+        personDS foreach ( person =>
+          System.out.println(s"id: ${person.user_id}\tName: ${person.name}")
+        )
+    } catch {
+      case ex:Exception => ex.printStackTrace()
+    }
 
     System.out.println("Done - Reading Dataset from Ignite Cache")
   }
@@ -66,8 +70,12 @@ object IgniteTest {
     val cache = igniteContext.fromCache("SQL_PUBLIC_PERSON")
 
     System.out.println(s"rdd contains ${cache.count()} records:")
-    cache map { person =>
-      System.out.println(s"id: ${person._1}\tName: ${person._2}")
+    try {
+      cache foreach { person =>
+        System.out.println(s"id: ${person._1}\tName: ${person._2}")
+      }
+    } catch {
+      case ex:Exception => ex.printStackTrace()
     }
     System.out.println("Done - Reading RDD from Ignite Cache")
   }
@@ -78,7 +86,7 @@ object IgniteTest {
     readAsRDD(config, spark)
   }
 
-  def main(args:Array[String]):Unit = {
+  def  main(args:Array[String]):Unit = {
     parser.parse(args, Config()) match {
       case Some(config) =>
         appConfig = config
@@ -99,11 +107,11 @@ object IgniteTest {
     head("Ignite Test", "0.0.1")
     cmd("createCache").action((_, c) => c.copy(mode = "createCache"))
       .text("create the cache and exit")
-    cmd("readAsDataset").action((_, c) => c.copy(mode = "createCache"))
+    cmd("readAsDataset").action((_, c) => c.copy(mode = "readAsDataset"))
       .text("read the cache as a Dataset and exit")
-    cmd("readAsRDD").action((_, c) => c.copy(mode = "createCache"))
+    cmd("readAsRDD").action((_, c) => c.copy(mode = "readAsRDD"))
       .text("read the cache as a RDD and exit")
-    cmd("doAll").action((_, c) => c.copy(mode = "createCache"))
+    cmd("doAll").action((_, c) => c.copy(mode = "doAll"))
       .text("create the cache and read both ways")
   }
 }
